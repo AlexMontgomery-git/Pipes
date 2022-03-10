@@ -1,0 +1,43 @@
+---
+title: "Pipes"
+author: "Alex Montgomery"
+date: "10/03/2022"
+output: html_document
+---
+
+```{r libraries, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse) #Load tidyverse
+library(ggplot2) #Load ggplot2
+```
+
+```{r overwatch logo, out.width = "50%", fig.align = "center", echo=FALSE}
+#Load and display pipe fitting jpeg
+img1 <- "images/professional-pipe-fitter.jpg"
+knitr::include_graphics(img1)
+```
+
+## Pipes Dataset
+The following dataset that shall be explored contains work orders from a utility company. The data represents jobs performed on pipes belonging to the company.
+
+```{r load data, echo=TRUE, warning=FALSE, include=TRUE}
+#Load the data set
+df = read.csv("data/raw/example.work.orders.csv")
+#Check the data is as expected
+head(df, 5)
+```
+
+## Codebook
+Variable Title | Explanation |
+|:------:|:------|
+JOB_ID | The unique identity of the work order |
+JOB_TYPE | The type of job performed |
+DEPTH_M | The depth of the pipe (m) |
+DIAMETER MM | The diameter of the pipe (mm) |
+MATERIAL | The material of the pipe |
+LENGTH_M | The length of the pipe (m) |
+JOB_COST | The cost of the job (£) |
+
+## Descriptive Statistics
+
+
