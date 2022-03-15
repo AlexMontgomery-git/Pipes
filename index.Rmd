@@ -6,9 +6,9 @@ output: html_document
 ---
 
 ```{r libraries, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse) #Load tidyverse
 library(ggplot2) #Load ggplot2
+library(stargazer) #Load stargazer
 ```
 
 ```{r overwatch logo, out.width = "50%", fig.align = "center", echo=FALSE}
@@ -22,10 +22,17 @@ The following dataset that shall be explored contains work orders from a utility
 
 ```{r load data, echo=TRUE, warning=FALSE, include=TRUE}
 #Load the data set
-df = read.csv("data/raw/example.work.orders.csv")
+dfraw = read.csv("data/raw/example.work.orders.csv")
 #Check the data is as expected
-head(df, 5)
+head(dfraw, 5)
 ```
+
+```{r structure data, echo=TRUE, warning=FALSE, include=TRUE}
+#Check the structure of the data
+str(dfraw)
+```
+
+It is important to check the structure of the data to, firstly, get to know the data better, but also to ensure each variable is the correct data type. For example, ensuring a numerical variable hasn't been coded as a string.
 
 ## Codebook
 Variable Title | Explanation |
@@ -38,6 +45,195 @@ MATERIAL | The material of the pipe |
 LENGTH_M | The length of the pipe (m) |
 JOB_COST | The cost of the job (£) |
 
-## Descriptive Statistics
-hey
 
+## Data Cleansing
+* Examining the descriptive statistics of a dataset can help identify outliers and data input errors. 
+* In this dataset, diameter appears to have an unlikely maximum value of 999999 mm. 
+* The minimum value of depth also indicates a possible data input error with the value being a negative number. 
+
+
+```{r data cleansing, echo=TRUE, warning=FALSE, include=TRUE}
+#Output descriptive statistics for all variables
+summary(dfraw)
+
+#Remove missing data
+dfraw <- na.omit(dfraw)
+
+#Sort data by Diameter
+dfraw <- dfraw[order(-dfraw$DIAMETER_MM),]
+head(dfraw, 5)
+
+#Remove observations with diameters above maximum set diameter
+maximum_diamater <- 10000
+
+cleandf <- subset(dfraw, DIAMETER_MM < maximum_diamater)
+
+#Remove observations with negative values of depth
+cleandf <- subset(cleandf, DEPTH_M > 0)
+
+#Convert JOB_TYPE to a factor and add to the dataset
+cleandf$JOB_TYPE <- as.factor(cleandf$JOB_TYPE)
+#Ensure JOB_TYPE is a factor data type
+class(cleandf$JOB_TYPE)
+
+#Convert MATERIAL to a factor and add to the dataset
+cleandf$MATERIAL <- as.factor(cleandf$MATERIAL)
+#Ensure MATERIAL is a factor data type
+class(cleandf$MATERIAL)
+```
+# 1. Describe the data provided.
+
+## Visualising the data 
+Visualising a dataset with histograms and bar charts often helps get a better understanding of the data. In this case, it appears that the 4 continuous variables all have a positive skew. Diameter appears to have clusters of data which suggests the piping company have preset diameters that are produced. 
+
+```{r descriptive visualising, echo=TRUE, warning=FALSE, include=TRUE}
+#Check the descriptive statistics after cleaning the data
+summary(cleandf)
+
+#Create histograms to visualise the continuous variables
+variables <- colnames(cleandf[c(3,4,6,7)])
+
+for(i in variables){
+hist(cleandf[,i],
+        xlab = i,
+        main = c("Histogram of", i),
+        breaks = sqrt(nrow(cleandf))
+        )
+  }
+
+#Create bar charts to visualise the categorical variables
+p1 <- ggplot(cleandf, aes(x = JOB_TYPE, fill = JOB_TYPE)) + 
+  geom_bar() +
+  theme(legend.position = "none") +
+  labs(y = "Frequency", x = "Job Type") +
+  ggtitle("Bar chart to show Job Type frequency ")
+p1
+
+p2 <- ggplot(cleandf, aes(x = MATERIAL, fill = MATERIAL)) + 
+  geom_bar() +
+  theme(legend.position = "none") +
+  labs(y = "Frequency", x = "Material") +
+  ggtitle("Bar chart to show Material frequency ")
+p2
+```
+
+# 2. Show how the cost of jobs is related to other features in the data.
+
+## Visualising continous variables
+Diameter has a clear positive linear relationship with job cost whereas depth and length have far weaker relationships with job cost 
+
+```{r visualising continous relationships, echo=TRUE, warning=FALSE, include=TRUE}
+#Plot regression line graph for DEPTH_MM and JOB_COST
+p3 <- ggplot(cleandf, aes(x = DEPTH_M, y = JOB_COST)) +
+    geom_point() +
+    geom_smooth(method = 'lm') 
+p3
+#Plot regression line graph for DIAMTER_MM and JOB_COST
+p4 <- ggplot(cleandf, aes(x = DIAMETER_MM, y = JOB_COST)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+p4
+#Plot regression line graph for LENGTH_M and JOB_COST
+p5 <- ggplot(cleandf, aes(x = LENGTH_M, y = JOB_COST)) +
+    geom_point() +
+    geom_smooth(method = 'lm')
+p5
+```
+
+## Visualising catagorical variables 
+
+```{r visualising catagorical relationships, echo=TRUE, warning=FALSE, include=TRUE}
+p6 <- ggplot(cleandf, aes(x = JOB_TYPE, y = JOB_COST)) +
+      geom_bar(stat = "identity")
+p6
+
+p7 <- ggplot(cleandf, aes(x = MATERIAL, y = JOB_COST)) +
+      geom_bar(stat = "identity")
+p7
+```
+
+# Analysing the data
+
+## Normalise/Standardise the data
+Normalising the predictor variables allows for direct comparison of effect size. 
+
+```{r create z variables, echo=TRUE, warning=FALSE, include=TRUE}
+#Z transform the continous predictor variables
+cleandf$zDEPTH <- (cleandf$DEPTH_M - mean(cleandf$DEPTH_M))/sd(cleandf$DEPTH_M)
+
+cleandf$zDIAMETER <- (cleandf$DIAMETER_MM - mean(cleandf$DIAMETER_MM))/sd(cleandf$DIAMETER_MM)
+
+cleandf$zLENGTH <- (cleandf$LENGTH_M - mean(cleandf$LENGTH_M))/sd(cleandf$LENGTH_M)
+#Check variables have been normalised 
+summary(cleandf)
+
+#Write cleandf
+write.table(cleandf, file = paste("cleanData.csv", sep = "/"), sep = ",", row.names = FALSE)
+```
+
+## Examine relationships 
+
+```{r analysing relationships, echo=TRUE, warning=FALSE, include=TRUE}
+#Multiple regression analysis
+JOB_COSTlm <- lm(JOB_COST ~ zDEPTH + zDIAMETER + zLENGTH + JOB_TYPE, data=cleandf)
+#Examine regression analysis
+summary(JOB_COSTlm)
+
+#Multiple regression analysis
+JOB_COSTlm2 <- lm(JOB_COST ~ zDEPTH + zDIAMETER + zLENGTH + JOB_TYPE + MATERIAL, data=cleandf)
+#Examine regression analysis
+summary(JOB_COSTlm2)
+
+#Compare models
+anova(JOB_COSTlm, JOB_COSTlm2)
+```
+ 
+## Examine interactions 
+
+```{r analysing interactions, echo=TRUE, warning=FALSE, include=TRUE}
+#Regression analysis including interactions
+JOB_COSTlm3 <- lm(JOB_COST ~ zDEPTH + zDIAMETER + zLENGTH + JOB_TYPE + MATERIAL + zDEPTH:JOB_TYPE + zDIAMETER:JOB_TYPE + zLENGTH:JOB_TYPE, data=cleandf)
+#Examine regression analysis
+summary(JOB_COSTlm3)
+```
+
+# 3. Prediciting the cost of a job 
+regression analysis without normalised variables 
+
+```{r predicting job cost , echo=TRUE, warning=FALSE, include=TRUE}
+#Regression analysis predicting job cost 
+JOB_COSTlm4 <- lm(JOB_COST ~ DEPTH_M + DIAMETER_MM + LENGTH_M + JOB_TYPE + MATERIAL, data=cleandf)
+#Examine regression analysis
+summary(JOB_COSTlm4)
+```
+
+The model explains **81.4%** of variance in the cost of a job. This suggest there are other variables effecting job cost. 81.4% is still a considerable amount of variance explained and so developing an equation to predict job cost may be useful. 
+
+### Regression formula
+
+Using the formula for a regression analysis we can create an equation to predict the cost of a job 
+**y = b1 * X1 + b2 * x2 + ... + bk * xk + a**
+
+### Formula for the current model
+
+Job Cost = DEPTH_M * DEPTH_M estimate + DIAMETER_MM * DIAMETER_MM estimate + LENGTH_M * LENGTH_M estimate + (1 if JOB_TPYE = replace, if not 0) * JOB_TYPEReplace estimate + (1 if MATERIAL = CI, if not 0) * MATERIALCI estimate + (1 if MATERIAL = ST, if not 0) * MATERIALST estiamte + intercept
+
+Job Cost = DEPTH_M * 3876.00 + DIAMETER_MM * 75.89 + LENGTH_M * 182.20 + (1 if JOB_TPYE = replace, if not 0) * 8170.00 + (1 if MATERIAL = CI, if not 0) * -40.52 + (1 if MATERIAL = CI, if not 0) * -34.74 - 20550.00
+
+### Formula in action 
+
+We can use this equation to calculate the job cost of a typical job if the piping company started creating piping in a new larger diameter size of 600mm.
+
+Using values of (mean values used)
+* DEPTH_M = 2.673
+* DIMATER_MM = 600
+* LENGTH = 25.13 
+* JOB_TYPE = Replace
+* MATERIAL = AC 
+
+
+```{r predicting job cost with large diameter , echo=TRUE, warning=FALSE, include=TRUE}
+JobCost = (2.673 * 3876) + (600 * 75.89) + (25.13 * 182.2) + (1 * 8170) + (0 * -40.52) + (0 * -34.74) - 20550
+
+JobCost
+```
